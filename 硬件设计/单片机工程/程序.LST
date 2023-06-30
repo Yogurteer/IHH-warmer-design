@@ -1,0 +1,337 @@
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE 程序
+OBJECT MODULE PLACED IN 程序.OBJ
+COMPILER INVOKED BY: D:\KEIL\C51\BIN\C51.EXE 程序.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /************************
+   2                   引脚定义
+   3                   RS  RW  EN    1.0 1.1  1.2
+   4                   CS  CLK  DIO   2.0  2.1  2.2
+   5          ************************/
+   6          #include <intrins.h>
+   7          #include <reg51.h>
+   8          
+   9          #define ulong unsigned long
+  10          #define uint unsigned int
+  11          #define uchar unsigned char
+  12          
+  13          unsigned char word1[16]={"CH = "};
+  14          
+  15          sbit ADCS =P2^0;  //ADC0832 chip seclect//芯片的CS引脚
+  16          sbit ADDI =P2^2;  //ADC0832 data in              //芯片的DIO引脚
+  17          sbit ADDO =P2^2;  //ADC0832 data out      //
+  18          sbit ADCLK =P2^1;  //ADC0832 clock signal       //芯片的CLK引脚
+  19          
+  20                    sbit rs=P1^0;
+  21          sbit rw=P1^1;
+  22          sbit en=P1^2;  
+  23          
+  24          
+  25          
+  26          
+  27          unsigned char readad[2];
+  28          
+  29          
+  30          void  Adc0832(unsigned char channel);
+  31          
+  32          float tt;
+  33          
+  34          
+  35          
+  36          
+  37          
+  38          
+  39          
+  40          
+  41          
+  42          
+  43          
+  44          
+  45          
+  46          
+  47          
+  48          
+  49          
+  50          
+  51          /*
+  52           1602液晶专用延时
+  53          */ 
+  54          
+  55           void DelayUs2x(unsigned char t)
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 2   
+
+  56          {   
+  57   1       while(--t);
+  58   1      }
+  59          
+  60          void DelayMs(unsigned char t)
+  61          {
+  62   1           
+  63   1       while(t--)
+  64   1       {
+  65   2           //大致延时1mS
+  66   2           DelayUs2x(245);
+  67   2               DelayUs2x(245);
+  68   2       }
+  69   1      }
+  70          
+  71          
+  72          void shuaxin(uint shuaxint)//刷新显示程序
+  73          {
+  74   1      while(shuaxint--);
+  75   1      }
+  76          //1602液晶判忙函数
+  77           bit LCD_Check_Busy(void) 
+  78           { 
+  79   1       P0=0xFF; 
+  80   1       rs=0; 
+  81   1       rw=1; 
+  82   1       en=0; 
+  83   1       _nop_(); 
+  84   1       en=1;
+  85   1       return (bit)(P0 & 0x80);
+  86   1       }
+  87          
+  88          //写入命令函数
+  89            void LCD_Write_Com(uchar com) 
+  90           {  
+  91   1       DelayMs(5);
+  92   1       rs=0; 
+  93   1       rw=0;; 
+  94   1       en=1; 
+  95   1       P0= com; 
+  96   1       _nop_(); 
+  97   1       en=0;
+  98   1       }
+  99          
+ 100           //写入数据函数
+ 101             void LCD_Write_Data(uchar Data) 
+ 102           { 
+ 103   1       DelayMs(5);
+ 104   1       rs=1; 
+ 105   1       rw=0; 
+ 106   1       en=1; 
+ 107   1       P0= Data; 
+ 108   1       _nop_();
+ 109   1       en=0;
+ 110   1       }
+ 111          
+ 112           //     LCD1602清屏函数
+ 113             void LCD_Clear(void) 
+ 114           { 
+ 115   1       LCD_Write_Com(0x01); 
+ 116   1       DelayMs(5);
+ 117   1       }
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 3   
+
+ 118          
+ 119           //       LCD1602写入字符函数
+ 120            void LCD_Write_Char(unsigned char x,unsigned char y,unsigned char Data) 
+ 121           {     
+ 122   1       if (y == 0) 
+ 123   1              {     
+ 124   2              LCD_Write_Com(0x80 + x);     
+ 125   2              }    
+ 126   1       else 
+ 127   1              {     
+ 128   2              LCD_Write_Com(0xC0 + x);     
+ 129   2              }        
+ 130   1       LCD_Write_Data( Data);  
+ 131   1       }
+ 132          
+ 133           //LCD1602写入字符串函数
+ 134             void LCD_Write_String(unsigned char x,unsigned char y,unsigned char *s) //写入字符串的函数
+ 135           {     
+ 136   1       if (y == 0) 
+ 137   1              {     
+ 138   2               LCD_Write_Com(0x80 + x);     //表示第一行
+ 139   2              }
+ 140   1       else 
+ 141   1              {      
+ 142   2              LCD_Write_Com(0xC0 + x);      //表示第二行
+ 143   2              }        
+ 144   1       while (*s) 
+ 145   1              {     
+ 146   2       LCD_Write_Data( *s);     
+ 147   2       s ++;     
+ 148   2              }
+ 149   1       }
+ 150          
+ 151           //LCD1602初始化函数
+ 152             void LCD_Init(void) 
+ 153           {
+ 154   1         LCD_Write_Com(0x38);    /*显示模式设置*/ 
+ 155   1         DelayMs(5); 
+ 156   1         LCD_Write_Com(0x38); 
+ 157   1         DelayMs(5); 
+ 158   1         LCD_Write_Com(0x38); 
+ 159   1         DelayMs(5); 
+ 160   1         LCD_Write_Com(0x38);  
+ 161   1         LCD_Write_Com(0x08);    /*显示关闭*/ 
+ 162   1         LCD_Write_Com(0x01);    /*显示清屏*/ 
+ 163   1         LCD_Write_Com(0x06);    /*显示光标移动设置*/ 
+ 164   1         DelayMs(5); 
+ 165   1         LCD_Write_Com(0x0C);    /*显示开及光标设置*/
+ 166   1         }
+ 167          
+ 168          
+ 169          
+ 170          
+ 171          
+ 172          
+ 173          
+ 174          
+ 175          
+ 176          
+ 177          /************
+ 178          读ADC0832函数
+ 179          ************/
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 4   
+
+ 180          
+ 181          //采集并返回
+ 182          void Adc0832(unsigned char channel)
+ 183          {
+ 184   1              uchar i=0;
+ 185   1              uchar j;
+ 186   1              uint dat=0;
+ 187   1              uchar ndat=0;
+ 188   1      
+ 189   1              if(channel==0)channel=2;
+ 190   1              if(channel==1)channel=3;
+ 191   1              ADDI=1;
+ 192   1              _nop_();
+ 193   1              _nop_();
+ 194   1              ADCS=0;//拉低CS端
+ 195   1              _nop_();
+ 196   1              _nop_();
+ 197   1              ADCLK=1;//拉高CLK端
+ 198   1              _nop_();
+ 199   1              _nop_();
+ 200   1              ADCLK=0;//拉低CLK端,形成下降沿1
+ 201   1              _nop_();
+ 202   1              _nop_();
+ 203   1              ADCLK=1;//拉高CLK端
+ 204   1              ADDI=channel&0x1;
+ 205   1              _nop_();
+ 206   1              _nop_();
+ 207   1              ADCLK=0;//拉低CLK端,形成下降沿2
+ 208   1              _nop_();
+ 209   1              _nop_();
+ 210   1              ADCLK=1;//拉高CLK端
+ 211   1              ADDI=(channel>>1)&0x1;
+ 212   1              _nop_();
+ 213   1              _nop_();
+ 214   1              ADCLK=0;//拉低CLK端,形成下降沿3
+ 215   1              ADDI=1;//控制命令结束 
+ 216   1              _nop_();
+ 217   1              _nop_();
+ 218   1              dat=0;
+ 219   1              for(i=0;i<8;i++)
+ 220   1              {
+ 221   2                      dat|=ADDO;//收数据
+ 222   2                      ADCLK=1;
+ 223   2                      _nop_();
+ 224   2                      _nop_();
+ 225   2                      ADCLK=0;//形成一次时钟脉冲
+ 226   2                      _nop_();
+ 227   2                      _nop_();
+ 228   2                      dat<<=1;
+ 229   2                      if(i==7)dat|=ADDO;
+ 230   2              }  
+ 231   1              for(i=0;i<8;i++)
+ 232   1              {
+ 233   2                      j=0;
+ 234   2                      j=j|ADDO;//收数据
+ 235   2                      ADCLK=1;
+ 236   2                      _nop_();
+ 237   2                      _nop_();
+ 238   2                      ADCLK=0;//形成一次时钟脉冲
+ 239   2                      _nop_();
+ 240   2                      _nop_();
+ 241   2                      j=j<<7;
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 5   
+
+ 242   2                      ndat=ndat|j;
+ 243   2                      if(i<7)ndat>>=1;
+ 244   2              }
+ 245   1              ADCS=1;//拉低CS端
+ 246   1              ADCLK=0;//拉低CLK端
+ 247   1              ADDO=1;//拉高数据端,回到初始状态
+ 248   1              readad[0]=dat;
+ 249   1              readad[1]=ndat;
+ 250   1      }
+ 251          
+ 252          void Tempprocess()
+ 253          {
+ 254   1              tt=readad[0]/255.0*5.0;
+ 255   1              word1[4]=(unsigned char )(tt);
+ 256   1              word1[5]='.';
+ 257   1              word1[6]=(unsigned char )(tt*10-word1[4]*10);
+ 258   1              word1[7]=(unsigned char )(tt*100-word1[4]*100-word1[6]*10);
+ 259   1              word1[8]=(unsigned char )(tt*1000-word1[4]*1000-word1[6]*100-word1[7]*10);
+ 260   1              word1[9]=(unsigned char )(tt*10000-word1[4]*10000-word1[6]*1000-word1[7]*100-word1[8]*10);
+ 261   1              word1[4]+=48;
+ 262   1              word1[6]+=48;
+ 263   1              word1[7]+=48;
+ 264   1              word1[8]+=48;
+ 265   1              word1[9]+=48;
+ 266   1              word1[10]='V';
+ 267   1      }
+ 268          
+ 269           void main()
+ 270           {
+ 271   1       
+ 272   1                                              LCD_Init(); 
+ 273   1              LCD_Clear();//清屏
+ 274   1      
+ 275   1       while(1)
+ 276   1       {
+ 277   2         Adc0832(0);
+ 278   2                                      Tempprocess();
+ 279   2      
+ 280   2      LCD_Write_String(0,0,"Dian ya shu ju:");
+ 281   2      LCD_Write_Char(4,1,word1[4]);
+ 282   2      LCD_Write_Char(5,1,'.');
+ 283   2      LCD_Write_Char(6,1,word1[6]);
+ 284   2      LCD_Write_Char(7,1,word1[7]);
+ 285   2      LCD_Write_Char(8,1,'V');
+ 286   2      
+ 287   2      
+ 288   2      
+ 289   2                              
+ 290   2      
+ 291   2      
+ 292   2       }
+ 293   1       }
+ 294          
+ 295           
+ 296          /*串行通讯中断，收发完成将进入该中断*/
+ 297          void Serial_interrupt() interrupt 4 
+ 298          {
+ 299   1      if(RI)
+ 300   1      {
+ 301   2              RI=0;//接收中断信号清零，表示将继续接收
+ 302   2      
+ 303   2      }
+C51 COMPILER V9.00   程序                                                                  02/14/2020 17:13:13 PAGE 6   
+
+ 304   1      } 
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1049    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     22    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
